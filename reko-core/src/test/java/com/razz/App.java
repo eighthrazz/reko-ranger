@@ -8,17 +8,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.io.FileUtils;
-import org.bson.Document;
-
 import com.amazonaws.services.rekognition.model.FaceDetection;
 import com.amazonaws.services.rekognition.model.GetFaceDetectionResult;
-import com.amazonaws.services.rekognition.model.GetFaceSearchRequest;
-import com.amazonaws.services.rekognition.model.PersonMatch;
 import com.amazonaws.services.rekognition.model.StartFaceDetectionResult;
-import com.amazonaws.services.rekognition.model.StartFaceSearchResult;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
-import com.mongodb.client.MongoCollection;
 import com.razz.aws.reko.AwsRekoFace;
 import com.razz.aws.reko.AwsRekognition;
 import com.razz.common.aws.AwsBucket;
@@ -34,16 +26,47 @@ import com.razz.common.util.ftp.FtpConfig;
 import com.razz.common.util.media.VideoUtils;
 
 public class App {
+	
+	final Properties props;
+	final FtpConfig ftpConfig;
+	final MongoConfig mongoConfig;
+	
+	public App() {
+		props = ConfigManager.get();
+		ftpConfig = new FtpConfig(props);
+		mongoConfig = new MongoConfig(props);
+	}
+	
+	void updateVideo() throws Exception {
+		try( final Ftp ftp = new Ftp(ftpConfig);
+			 final Mongo mongo = new Mongo(mongoConfig)	) 
+		{
+			ftp.connect();
+			mongo.connect();
+			
+			final Path ftpPath = Paths.get(props.getProperty("ftp.path"));
+			final List<File> fileList = ftp.getFileList(ftpPath);
+			for(File file : fileList) {
+				final String path = file.getPath();
+				final VideoDO video = new VideoDO(path);
+				final VideoDAO videoDAO = new VideoDAO(mongo.getDatastore());
+				videoDAO.save(video);
+			}
+		}
+	}
+	
+	
+	
     public static void main( String[] args ) {
     	final Properties props = ConfigManager.get();
 		
 		final FtpConfig ftpConfig = new FtpConfig(props);
-		final Ftp ftp = new Ftp();
+		final Ftp ftp = new Ftp(ftpConfig);
 		
 		File remoteFile = null;
 		File localFile = null;
 		try {
-			ftp.connect(ftpConfig);
+			ftp.connect();
 			
 			final Path ftpPath = Paths.get(props.getProperty("ftp.path"));
 			final List<File> fileList = ftp.getFileList(ftpPath);
@@ -60,10 +83,12 @@ public class App {
 			ftp.close();
 		}
 		
-		final MongoConfig noSqlConfig = new MongoConfig(props);
-		final Mongo noSql = new Mongo();
+		
+		
+		final MongoConfig mongoConfig = new MongoConfig(props);
+		final Mongo noSql = new Mongo(mongoConfig);
 		try { 
-			noSql.connect(noSqlConfig);
+			noSql.connect();
 			
 			final VideoDO video = new VideoDO(remoteFile.toString());
 			final VideoDAO videoDAO = new VideoDAO(noSql.getDatastore());
