@@ -1,4 +1,4 @@
-package com.razz;
+package com.razz.aws.reko.swing;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -41,21 +41,40 @@ public class App {
 		try( final Ftp ftp = new Ftp(ftpConfig);
 			 final Mongo mongo = new Mongo(mongoConfig)	) 
 		{
-			ftp.connect();
-			mongo.connect();
-			
-			final Path ftpPath = Paths.get(props.getProperty("ftp.path"));
+			final Path ftpPath = Paths.get( props.getProperty("ftp.path") );
 			final List<File> fileList = ftp.getFileList(ftpPath);
 			for(File file : fileList) {
 				final String path = file.getPath();
 				final VideoDO video = new VideoDO(path);
-				final VideoDAO videoDAO = new VideoDAO(mongo.getDatastore());
+				final VideoDAO videoDAO = new VideoDAO( mongo.getDatastore() );
 				videoDAO.save(video);
 			}
 		}
 	}
 	
+	List<VideoDO> getVideoList() throws Exception {
+		try( final Mongo mongo = new Mongo(mongoConfig) ) {
+			final VideoDAO videoDAO = new VideoDAO( mongo.getDatastore() );
+			return videoDAO.get();
+		}
+	}
 	
+	File copyToLocal(String remoteFile) throws Exception {
+		try( final Ftp ftp = new Ftp(ftpConfig) ) {
+			final File localFile = ftp.copy(remoteFile);
+			return localFile;
+		}
+	}
+	
+	File trim(File localFile) throws Exception {
+		final File mp4SrcFile = localFile;
+		final File mp4DstFile = FileHelper.getTmpFile("mp4");
+		final long begin = 0;
+		final long end = 15;
+		final TimeUnit timeUnit = TimeUnit.SECONDS;
+		VideoUtils.trim(mp4SrcFile, mp4DstFile, begin, end, timeUnit);
+		return mp4DstFile;
+	}
 	
     public static void main( String[] args ) {
     	final Properties props = ConfigManager.get();
@@ -83,8 +102,6 @@ public class App {
 			ftp.close();
 		}
 		
-		
-		
 		final MongoConfig mongoConfig = new MongoConfig(props);
 		final Mongo noSql = new Mongo(mongoConfig);
 		try { 
@@ -107,9 +124,7 @@ public class App {
 			final long begin = 0;
 			final long end = 8000;
 			final TimeUnit timeUnit = TimeUnit.MILLISECONDS;
-			final boolean includeAudio = false;
-			final boolean includeVideo = true;
-			VideoUtils.trim(mp4SrcFile, mp4DstFile, begin, end, timeUnit, includeAudio, includeVideo);
+			VideoUtils.trim(mp4SrcFile, mp4DstFile, begin, end, timeUnit);
 		} catch(Exception e) {
 			e.printStackTrace();
 			return;
