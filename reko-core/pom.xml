@@ -9,20 +9,14 @@
 	<parent>
 		<groupId>com.razz</groupId>
 		<artifactId>reko-ranger</artifactId>
-		<version>1.0</version>
+		<version>1.0-SNAPSHOT</version>
 	</parent>
 
 	<dependencies>
 		<dependency>
-			<groupId>junit</groupId>
-			<artifactId>junit</artifactId>
-			<version>3.8.1</version>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
 			<groupId>com.razz</groupId>
 			<artifactId>common-utils</artifactId>
-			<version>1.0</version>
+			<version>1.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.mongodb.morphia</groupId>
@@ -38,6 +32,12 @@
 			<groupId>com.amazonaws</groupId>
 			<artifactId>aws-java-sdk-rekognition</artifactId>
 			<version>1.11.313</version>
+		</dependency>
+		<dependency>
+			<groupId>junit</groupId>
+			<artifactId>junit</artifactId>
+			<version>3.8.1</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 
