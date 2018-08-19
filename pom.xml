@@ -18,11 +18,11 @@
 	<distributionManagement>
 		<snapshotRepository>
 			<id>nexus-snapshots</id>
-			<url>http://192.168.2.101:8081/repository/maven-snapshots/</url>
+			<url>http://docker.razz.com/nexus/repository/maven-snapshots/</url>
 		</snapshotRepository>
 		<repository>
 			<id>nexus-releases</id>
-			<url>http://192.168.2.101:8081/repository/maven-releases/</url>
+			<url>http://docker.razz.com/nexus/repository/maven-releases/</url>
 		</repository>
 	</distributionManagement>
 	
