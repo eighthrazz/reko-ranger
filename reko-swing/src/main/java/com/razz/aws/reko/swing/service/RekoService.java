@@ -4,11 +4,13 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.amazonaws.services.rekognition.model.FaceDetail;
 import com.amazonaws.services.rekognition.model.FaceDetection;
 import com.amazonaws.services.rekognition.model.GetFaceDetectionResult;
 import com.amazonaws.services.rekognition.model.StartFaceDetectionResult;
@@ -20,7 +22,10 @@ import com.razz.common.aws.AwsConfig;
 import com.razz.common.helper.FileHelper;
 import com.razz.common.mongo.Mongo;
 import com.razz.common.mongo.MongoConfig;
+import com.razz.common.mongo.dao.FaceDAO;
 import com.razz.common.mongo.dao.VideoDAO;
+import com.razz.common.mongo.model.FaceDO;
+import com.razz.common.mongo.model.FactoryDO;
 import com.razz.common.mongo.model.VideoDO;
 import com.razz.common.util.config.ConfigManager;
 import com.razz.common.util.ftp.Ftp;
@@ -47,13 +52,12 @@ public class RekoService {
 		try( final Ftp ftp = new Ftp(ftpConfig);
 			 final Mongo mongo = new Mongo(mongoConfig)	) 
 		{
-			final Path ftpPath = Paths.get( props.getProperty("ftp.path") );
+			final Path ftpPath = Paths.get( props.getProperty("ftp.src.path") );
 			final List<File> fileList = ftp.getFileList(ftpPath);
 			for(File file : fileList) {
-				final String path = file.getPath();
-				final VideoDO video = new VideoDO(path);
 				final VideoDAO videoDAO = new VideoDAO( mongo.getDatastore() );
-				videoDAO.save(video);
+				final VideoDO videoDO = FactoryDO.createVideoDO(file);
+				videoDAO.save(videoDO);
 			}
 		}
 	}
@@ -68,9 +72,21 @@ public class RekoService {
 	public void update(VideoDO videoDO) throws Exception {
 		try( final Mongo mongo = new Mongo(mongoConfig) ) {
 			final VideoDAO videoDAO = new VideoDAO( mongo.getDatastore() );
-			videoDAO.update(videoDO);
+			videoDAO.save(videoDO);
 		}
 	}
+	
+//	public void update(VideoDO videoDO, List<FaceDetail> faceDetailList) throws Exception {
+//		final String key = videoDO.getKey();
+//		try( final Mongo mongo = new Mongo(mongoConfig) ) {
+//			final FaceDAO faceDAO = new FaceDAO( mongo.getDatastore() );
+//			for(int i=0;i<faceDetailList.size();i++) {
+//				final FaceDetail faceDetail = faceDetailList.get(i);
+//				final FaceDO faceDO = FactoryDO.createFaceDO(key, i, faceDetail);
+//				faceDAO.save(faceDO);
+//			}
+//		}
+//	}
 	
 	public File copyToLocal(String remoteFile) throws Exception {
 		try( final Ftp ftp = new Ftp(ftpConfig) ) {
@@ -87,6 +103,17 @@ public class RekoService {
 		final TimeUnit timeUnit = TimeUnit.SECONDS;
 		VideoUtils.trim(mp4SrcFile, mp4DstFile, begin, end, timeUnit);
 		return mp4DstFile;
+	}
+	
+	public File storeVideo(VideoDO videoDO, File localFile) throws Exception {
+		File remoteFile = null;
+		try( final Ftp ftp = new Ftp(ftpConfig) ) {
+			final String fileName = localFile.getName();
+			final String ftpStorePath = props.getProperty("ftp.store.path");
+			remoteFile = Paths.get(ftpStorePath, fileName).toFile();
+			ftp.store(localFile, remoteFile);
+		}
+		return remoteFile;
 	}
 	
 	public List<S3ObjectSummary> listAwsBucket() {
@@ -132,8 +159,16 @@ public class RekoService {
 			return null;
 		}
 		
-		final List<FaceDetection> faces = faceDetectionResult.getFaces();
-		return faces;
+		final List<FaceDetection> facesDetectionList = faceDetectionResult.getFaces();
+		return facesDetectionList;
+	}
+	
+	static List<FaceDetail> toFaceDetailList(List<FaceDetection> facesDetectionList) {
+		final List<FaceDetail> faceDetailList = new ArrayList<>();
+		for(FaceDetection fd : facesDetectionList) {
+			faceDetailList.add( fd.getFace() );
+		}
+		return faceDetailList;
 	}
 	
 	//TODO remove me
@@ -168,7 +203,7 @@ public class RekoService {
 		try { 
 			noSql.connect();
 			
-			final VideoDO video = new VideoDO(remoteFile.toString());
+			final VideoDO video = FactoryDO.createVideoDO(remoteFile);
 			final VideoDAO videoDAO = new VideoDAO(noSql.getDatastore());
 			videoDAO.save(video);
 		} catch(Exception e) {

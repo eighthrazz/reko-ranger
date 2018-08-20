@@ -1,16 +1,14 @@
 package com.razz.aws.reko;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.naming.TimeLimitExceededException;
+
 import com.amazonaws.services.rekognition.model.StartFaceDetectionRequest;
 import com.amazonaws.services.rekognition.model.StartFaceDetectionResult;
 import com.amazonaws.services.rekognition.model.StartFaceSearchRequest;
 import com.amazonaws.services.rekognition.model.StartFaceSearchResult;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import javax.naming.TimeLimitExceededException;
-
 import com.amazonaws.services.rekognition.model.Attribute;
 import com.amazonaws.services.rekognition.model.DetectFacesRequest;
 import com.amazonaws.services.rekognition.model.DetectFacesResult;

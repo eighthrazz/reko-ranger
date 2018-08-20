@@ -4,6 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,9 +16,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingUtilities;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.table.AbstractTableModel;
 
-import com.amazonaws.services.rekognition.model.FaceDetection;
 import com.razz.aws.reko.swing.service.RekoService;
 import com.razz.common.mongo.model.VideoDO;
 
@@ -25,6 +28,7 @@ public class VideoPanel extends JPanel implements ActionListener {
 	private static final long serialVersionUID = -276654446537198078L;
 
 	private final RekoService rekoService;
+	private final List<PropertyChangeListener> pclList;
 	
 	private TableModel tableModel;
 	private JTable table;
@@ -32,7 +36,20 @@ public class VideoPanel extends JPanel implements ActionListener {
 	
 	public VideoPanel(RekoService rekoService) {
 		this.rekoService = rekoService;
+		pclList = new ArrayList<>();
+		
 		initComponents();
+		
+		table.getSelectionModel().addListSelectionListener( new ListSelectionListener() {
+			public void valueChanged(ListSelectionEvent e) {
+				final VideoDO getSelectedVideo = getSelectedVideo();
+				if(getSelectedVideo != null) {
+					for(PropertyChangeListener pcl : pclList) {
+						pcl.propertyChange( new PropertyChangeEvent(null, null, null, getSelectedVideo) );
+					}
+				}
+			}
+		});
 	}
 	
 	private void initComponents() {
@@ -58,6 +75,10 @@ public class VideoPanel extends JPanel implements ActionListener {
 		add(btnPNL, BorderLayout.SOUTH);
 		
 		setBorder( BorderFactory.createTitledBorder("Local Videos") );
+	}
+	
+	public void addTableSelectionListener(PropertyChangeListener pcl) {
+		pclList.add(pcl);
 	}
 	
 	public VideoDO getSelectedVideo() {
@@ -124,7 +145,7 @@ public class VideoPanel extends JPanel implements ActionListener {
 
 		private static final long serialVersionUID = 6885383098798741282L;
 		
-		private final String[] columns = {"Path", "Face Count"};
+		private final String[] columns = {"Key"};
 		private final List<VideoDO> vidList;
 		
 		TableModel() {
@@ -160,10 +181,7 @@ public class VideoPanel extends JPanel implements ActionListener {
 		public Object getValueAt(int rowIndex, int columnIndex) {
 			switch(columnIndex) {
 				case 0:
-					return vidList.get(rowIndex).getPath();
-				case 1:
-					final List<FaceDetection> faceList = vidList.get(rowIndex).getFaceList();
-					return faceList != null ? faceList.size() : "0";
+					return vidList.get(rowIndex).getKey();
 				default :
 					return "unknown column index";
 			}

@@ -24,7 +24,7 @@ public class ImagePanel extends JPanel {
 		contentPNL = new JPanel( new FlowLayout(FlowLayout.LEFT) );
 		
 		setLayout( new BorderLayout() );
-		add( new JScrollPane(contentPNL) );
+		add( new JScrollPane(contentPNL), BorderLayout.CENTER );
 		
 		setBorder( BorderFactory.createTitledBorder("Faces") );
 	}
