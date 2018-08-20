@@ -16,12 +16,12 @@
 		<dependency>
 			<groupId>com.razz</groupId>
 			<artifactId>reko-core</artifactId>
-			<version>1.0-SNAPSHOT</version>
+			<version>1.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.razz</groupId>
 			<artifactId>common-utils</artifactId>
-			<version>1.0-SNAPSHOT</version>
+			<version>1.0</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
