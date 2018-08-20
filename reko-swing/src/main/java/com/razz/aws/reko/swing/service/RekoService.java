@@ -1,4 +1,4 @@
-package com.razz.aws.reko.swing;
+package com.razz.aws.reko.swing.service;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -7,10 +7,12 @@ import java.nio.file.Paths;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.amazonaws.services.rekognition.model.FaceDetection;
 import com.amazonaws.services.rekognition.model.GetFaceDetectionResult;
 import com.amazonaws.services.rekognition.model.StartFaceDetectionResult;
+import com.amazonaws.services.s3.model.S3ObjectSummary;
 import com.razz.aws.reko.AwsRekoFace;
 import com.razz.aws.reko.AwsRekognition;
 import com.razz.common.aws.AwsBucket;
@@ -25,19 +27,23 @@ import com.razz.common.util.ftp.Ftp;
 import com.razz.common.util.ftp.FtpConfig;
 import com.razz.common.util.media.VideoUtils;
 
-public class App {
+public class RekoService {
 	
 	final Properties props;
 	final FtpConfig ftpConfig;
 	final MongoConfig mongoConfig;
+	final AwsConfig awsConfig;
+	final AtomicReference<AwsBucket> awsBucketRef;
 	
-	public App() {
+	public RekoService() {
 		props = ConfigManager.get();
 		ftpConfig = new FtpConfig(props);
 		mongoConfig = new MongoConfig(props);
+		awsConfig = new AwsConfig(props);
+		awsBucketRef = new AtomicReference<AwsBucket>( new AwsBucket(awsConfig) );
 	}
 	
-	void updateVideo() throws Exception {
+	public void discoverNewVideos() throws Exception {
 		try( final Ftp ftp = new Ftp(ftpConfig);
 			 final Mongo mongo = new Mongo(mongoConfig)	) 
 		{
@@ -52,21 +58,28 @@ public class App {
 		}
 	}
 	
-	List<VideoDO> getVideoList() throws Exception {
+	public List<VideoDO> getVideoList() throws Exception {
 		try( final Mongo mongo = new Mongo(mongoConfig) ) {
 			final VideoDAO videoDAO = new VideoDAO( mongo.getDatastore() );
 			return videoDAO.get();
 		}
 	}
 	
-	File copyToLocal(String remoteFile) throws Exception {
+	public void update(VideoDO videoDO) throws Exception {
+		try( final Mongo mongo = new Mongo(mongoConfig) ) {
+			final VideoDAO videoDAO = new VideoDAO( mongo.getDatastore() );
+			videoDAO.update(videoDO);
+		}
+	}
+	
+	public File copyToLocal(String remoteFile) throws Exception {
 		try( final Ftp ftp = new Ftp(ftpConfig) ) {
 			final File localFile = ftp.copy(remoteFile);
 			return localFile;
 		}
 	}
 	
-	File trim(File localFile) throws Exception {
+	public File trim(File localFile) throws Exception {
 		final File mp4SrcFile = localFile;
 		final File mp4DstFile = FileHelper.getTmpFile("mp4");
 		final long begin = 0;
@@ -76,6 +89,54 @@ public class App {
 		return mp4DstFile;
 	}
 	
+	public List<S3ObjectSummary> listAwsBucket() {
+		final AwsBucket awsBucket = awsBucketRef.get();
+		final List<S3ObjectSummary> list = awsBucket.list();
+		return list;
+	}
+	
+	public void delete(String keyName) {
+		final AwsBucket awsBucket = awsBucketRef.get();
+		awsBucket.delete(keyName);
+	}
+	
+	public String saveToAwsBucket(File file) {
+		final AwsBucket awsBucket = awsBucketRef.get();
+		final String keyName = AwsBucket.getKeyName(file);
+		awsBucket.save(keyName, file);
+		return keyName;
+	}
+	
+	public File downloadFromAwsBucket(String keyName) throws Exception {
+		final AwsBucket awsBucket = awsBucketRef.get();
+		final File tmpFile = FileHelper.getTmpFile("mp4");
+		awsBucket.download(keyName, tmpFile);
+		return tmpFile;
+	}
+	
+	public List<FaceDetection> detectFaces(String keyName) {
+		final AwsRekognition awsRekognition = new AwsRekognition(awsConfig);
+		final AwsRekoFace awsRekoFace = new AwsRekoFace(awsRekognition);
+		
+		final StartFaceDetectionResult result = awsRekoFace.detectInVideo(keyName);
+		System.out.format("result=%s%n", result);
+		
+		final String jobId = result.getJobId();
+		final int maxResults = 10;
+		GetFaceDetectionResult faceDetectionResult = null;
+		try {
+			final long maxWaitMillis = 30000;
+			faceDetectionResult = awsRekoFace.waitFaceDetection(jobId, maxResults, maxWaitMillis);
+		} catch(Exception e) {
+			e.printStackTrace();
+			return null;
+		}
+		
+		final List<FaceDetection> faces = faceDetectionResult.getFaces();
+		return faces;
+	}
+	
+	//TODO remove me
     public static void main( String[] args ) {
     	final Properties props = ConfigManager.get();
 		
